@@ -195,7 +195,6 @@ def debugger2(num_source=1, d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIF
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
             alpha=PROTON_INJECTION_SPECTRUM):
     Nd = int(Nd)
-    t = np.random.uniform(0,t_life,Nd)
     approx_AMS = np.sqrt(1.16)*(1.10655)**((np.arange(721) - 5)/10)
     approx_DAMPE = 1983*(1.58308693)**((np.arange(91) - 5)/10)
     E = np.concatenate((approx_AMS, approx_DAMPE))/1000
@@ -218,47 +217,50 @@ def debugger2(num_source=1, d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIF
     sigmas = 0.1 + 0.2*np.arange(26)
     resultint = np.zeros_like(sigmas)
     resultpoint = np.zeros_like(sigmas)
-    for j in range(20):
+    for j in range(100):
         Gint = np.zeros((Nd,len(ED)))
+        Gint1 = np.zeros((Nd,len(E)))
         Gpoint = np.zeros((Nd,len(ED)))
         for k in range(num_source):
+            t = np.random.uniform(0,2*num_source*t_life,Nd)
             rd1 = diffusion_length(E, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
             rd = np.where(rd1>0, rd1, 1e-99)
             ct1 = causal_length(E, t, p_break, t_life, p_max, p_min,t_break)
             g1 = (np.pi*rd)**(-3/2) * np.exp(-d**2/rd) * E**(-alpha)
             g11 = np.where(d<ct1, g1, 0)
-            G = np.where(rd1>0, g11, 0) + normall
-            slope = np.log(G[:,1:]/G[:,:-1]) / (np.log(Ehigh/Elow))
-            gi1 = np.where(slope==-1, G[:,:-1]*np.log(Ehigh/Elow) , G[:,:-1]/(slope+1)*(Ehigh**(slope+1)-Elow**(slope+1)))
-            gi = np.concatenate((np.sum(gi1[:,:720].reshape(Nd,72,10),axis=2) ,
-                             np.sum(gi1[:,721:].reshape(Nd,9,10),axis=2)), axis=1) / (np.delete(Edge,73)[1:] - np.delete(Edge,73)[:-1])
+            G = np.where(rd1>0, g11, 0) 
             rd2 = diffusion_length(ED, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
             rd3 = np.where(rd2>0, rd2, 1e-99)
             ct2 = causal_length(ED, t, p_break, t_life, p_max, p_min,t_break)
             g2 = (np.pi*rd3)**(-3/2) * np.exp(-d**2/rd3) * ED**(-alpha)
             g21 = np.where(d<ct2, g2, 0)
             G2 = np.where(rd2>0, g21, 0)
-            Gint += (gi-normi)
+            Gint1 += G
             Gpoint +=G2
-        ratio1 = Gint/norm
+        Gint = Gint1 + normall
+        slope = np.log(Gint[:,1:]/Gint[:,:-1]) / (np.log(Ehigh/Elow))
+        gi1 = np.where(slope==-1, Gint[:,:-1]*np.log(Ehigh/Elow) , Gint[:,:-1]/(slope+1)*(Ehigh**(slope+1)-Elow**(slope+1)))
+        gi = np.concatenate((np.sum(gi1[:,:720].reshape(Nd,72,10),axis=2) ,
+                             np.sum(gi1[:,721:].reshape(Nd,9,10),axis=2)), axis=1) / (np.delete(Edge,73)[1:] - np.delete(Edge,73)[:-1])
+        ratio1 = (gi-normi)/norm
         ratio2 = Gpoint/norm
         dif1 = np.diff(ratio1,axis=1)
         dif2 = np.diff(ratio2,axis=1)
         for i,sigma in enumerate(sigmas):
             resultint[i] += np.sum(np.any(np.delete(dif1,71,axis=1)>sigma*jumplimstat, axis=1))
             resultpoint[i] += np.sum(np.any(np.delete(dif2,71,axis=1)>sigma*jumplimstat, axis=1))
-    return np.append(resultint/(20*Nd), resultpoint/(20*Nd))
+    return np.append(resultint/(100*Nd), resultpoint/(100*Nd))
 
 test = np.zeros((15,52))
 for i in range(15):
     start2 = timeit.default_timer()
-    test[i] = debugger2(i+1,d=75,Nd=1e3)
-    print(i, timeit.default_timer() - start2)
+    test[i] = debugger2(i+1,d=300,Nd=1e3)
+    #print(i, timeit.default_timer() - start2)
 #print(test)
-np.save('numb_sources_75pc_2e4realization',test)
+np.save('numb_sources_300pc_doubletime_1e5realization',test)
 
 # mymean = np.array([mean_bessel(E) for E in AMS_DAMPE_DEFAULT_RIGIDITY_ARRAY])
-Antonsmean = np.load('mean_Anton.npy')*(1000*AMS_DAMPE_DEFAULT_RIGIDITY_ARRAY)**PROTON_INJECTION_SPECTRUM
+#Antonsmean = np.load('mean_Anton.npy')*(1000*AMS_DAMPE_DEFAULT_RIGIDITY_ARRAY)**PROTON_INJECTION_SPECTRUM
 
 # plt.loglog(AMS_DAMPE_DEFAULT_RIGIDITY_ARRAY,mymean)
 # plt.loglog(AMS_DAMPE_DEFAULT_RIGIDITY_ARRAY,Antonsmean)
