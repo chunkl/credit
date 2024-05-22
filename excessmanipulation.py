@@ -12,7 +12,7 @@ import sys
 from joblib import Parallel, delayed
 import multiprocessing
 from scipy.signal import find_peaks
-import seaborn as sb
+
 
 def releseslope(lifetime, t_sed=1.6e3, p_m=3e3, p_min=1e-3):
     x = np.log(lifetime) - np.log(t_sed)
@@ -35,6 +35,7 @@ left = np.loadtxt('H4000_R20_D0norm_Ratehalf')
 right = np.loadtxt('H4000_R20_D0norm_Ratedouble')
 prob = np.loadtxt('H4000_R20_D0norm_sedovdouble')
 probmaxdist = np.loadtxt('maxdist')
+debugprob = np.load('numb_sources_300pc_1.5e5realization.npy')
 
 #peaks, _ = find_peaks(life[1]/(N+10-np.arange(N)))
 # plt.plot(ages,one10kyr,label='1000pc/base')
@@ -56,28 +57,28 @@ ages = np.logspace(4.5,6.3,50)
 distances = np.linspace(100,10000,90)
 power = 3*maxage/100*(2000**2/2e4**2)
 plot = probmaxdist[:,:26]*100
-norm = colors.Normalize(0,100)
+norm = colors.Normalize(np.min(debugprob),np.max(debugprob))
 maxdists = np.array([100,200,300,400,500,600,1000,2000,4000])/1000
 binnumber = 9 * (np.arange(45) + 1)
 maxages = np.logspace(np.log10(1e5/4),np.log10(4*1e5),9)/1000
 #ax1 = sb.heatmap(sysall.T,xticklabels=sigmas,yticklabels=["%.1g" % x for x in breakE][::3])
 #ax1.yaxis.set_major_locator(plt.MaxNLocator(16))
-plt.pcolormesh(sigmas,maxdists,plot,norm=norm,shading='flat')
+plt.pcolormesh(sigmas,np.arange(15)+1,debugprob[:,26:],norm=norm)
 #plt.vlines(2.13,maxdists[0],maxdists[-1],color='red',linewidth=0.5)
 #plt.imshow(sysall.T,interpolation='bilinear')
 #plt.plot(sigmas,plotting[1:].T)
 plt.xlabel('$\sigma_{stat}$')
 #plt.xscale('log')
 #plt.yscale('log')
-plt.ylabel('search dist [kpc]')
+plt.ylabel('number of sources')
 #fig = ax1.get_figure()
-plt.title('$R_{break} = 10TV$, integrated, jumps only above $R_{break}$')
+plt.title('point sampling greens functions')
 plt.colorbar(label='probability of seeing at least a jump [%]')
-cont = plt.contour(sigmas,maxdists,plot,levels=[30,84.1,93.3,97.7,99.3,99.9],colors='b',linewidths=0.3)
-plt.clabel(cont,fontsize=5.5,colors='k',alpha=1)
+#cont = plt.contour(sigmas,maxdists,plot,levels=[30,84.1,93.3,97.7,99.3,99.9],colors='b',linewidths=0.3)
+#plt.clabel(cont,fontsize=5.5,colors='k',alpha=1)
 #plt.xlim(0,5)
 #plt.legend(['all','1-200GeV','200-1000GeV','1-3000TeV'])
-plt.savefig('maxdistint.png',dpi=150)
+plt.savefig('numb_sources_300pc_1.5e5realization_point.png',dpi=150)
 
 # plt.rc('font', size=22)
 # fig, axs = plt.subplots(1,3,sharey=True,figsize=(30,10))
