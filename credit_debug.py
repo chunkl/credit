@@ -151,6 +151,15 @@ def causal_length(E, t_SNR,
     result = c * (t_SNR[:,np.newaxis]*yrs - escape_time(E,p_break,t_life,p_max,p_min,t_break)) / pcm
     return result
 
+def thetafunction_credit(E, t_SNR, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM,
+                     p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY,
+                     p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001, H=HALO_HEIGHT):
+    rd = diffusion_length(E,t_SNR,D_0,delta,p_break,t_life,p_max,p_min,t_break)
+    h224Dt = (2*H)**2 / rd
+    xs = thetaarray[0]
+    ys = thetaarray[1]
+    return np.interp(h224Dt, xs, ys,0,1)
+
 def debugger(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
             alpha=PROTON_INJECTION_SPECTRUM):
@@ -191,9 +200,10 @@ def debugger(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM
     fluxi = np.sum(gi-normi,axis=0)
     fluxp = np.sum(G2,axis=0)
     return fluxi
+
 def debugger2(num_source=1, d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
-            alpha=PROTON_INJECTION_SPECTRUM):
+            alpha=PROTON_INJECTION_SPECTRUM, H=HALO_HEIGHT):
     Nd = int(Nd)
     approx_AMS = np.sqrt(1.16)*(1.10655)**((np.arange(721) - 5)/10)
     approx_DAMPE = 1983*(1.58308693)**((np.arange(91) - 5)/10)
@@ -226,13 +236,13 @@ def debugger2(num_source=1, d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIF
             rd1 = diffusion_length(E, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
             rd = np.where(rd1>0, rd1, 1e-99)
             ct1 = causal_length(E, t, p_break, t_life, p_max, p_min,t_break)
-            g1 = (np.pi*rd)**(-3/2) * np.exp(-d**2/rd) * E**(-alpha)
+            g1 = (np.pi*rd)**(-3/2) * np.exp(-d**2/rd) * E**(-alpha) * thetafunction_credit(E,t,D_0,delta,p_break,t_life,p_max,p_min,t_break,H)
             g11 = np.where(d<ct1, g1, 0)
             G = np.where(rd1>0, g11, 0) 
             rd2 = diffusion_length(ED, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
             rd3 = np.where(rd2>0, rd2, 1e-99)
             ct2 = causal_length(ED, t, p_break, t_life, p_max, p_min,t_break)
-            g2 = (np.pi*rd3)**(-3/2) * np.exp(-d**2/rd3) * ED**(-alpha)
+            g2 = (np.pi*rd3)**(-3/2) * np.exp(-d**2/rd3) * ED**(-alpha) * thetafunction_credit(ED,t,D_0,delta,p_break,t_life,p_max,p_min,t_break,H)
             g21 = np.where(d<ct2, g2, 0)
             G2 = np.where(rd2>0, g21, 0)
             Gint1 += G
