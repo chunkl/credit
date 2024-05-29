@@ -271,7 +271,7 @@ def debugger_point_uncredit(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIF
 
 def debugger_monte(d=300, case=0, num_source=1, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
-            alpha=PROTON_INJECTION_SPECTRUM, H=HALO_HEIGHT):
+            alpha=PROTON_INJECTION_SPECTRUM, H=HALO_HEIGHT,finer_mean=1):
     num_source = int(num_source)
     Nd = int(Nd)
     E = 1983*(1.58308693)**np.arange(9)[-5:]/1000
@@ -280,10 +280,11 @@ def debugger_monte(d=300, case=0, num_source=1, Nd=1500, D_0=DIFFUSION_COEFFICIE
     jumplimstat = 1e-4 * (Edge/1e-3) ** power / 1.5
     sigmas = np.linspace(0, 5, 100)
     result = np.zeros_like(sigmas)
+    mean = np.zeros_like(E)
     if case==0:
-        norm = debugger_point(d,Nd,D_0,delta,t_sed,p_break,t_life,p_max,p_min,t_break,alpha,H)[-5:]
+        norm = debugger_point(d,finer_mean*Nd,D_0,delta,t_sed,p_break,t_life,p_max,p_min,t_break,alpha,H)[-5:]/finer_mean
     elif case==1:
-        norm = debugger_point_uncredit(d,Nd,D_0,delta,H,t_life)[-5:]
+        norm = debugger_point_uncredit(d,finer_mean*Nd,D_0,delta,H,t_life)[-5:]/finer_mean
     else:
         return 'no case'
     for i in range(num_source):
@@ -297,21 +298,88 @@ def debugger_monte(d=300, case=0, num_source=1, Nd=1500, D_0=DIFFUSION_COEFFICIE
         G2 = np.sum(G,axis=0)
         ratio = G2/norm
         dif = np.diff(ratio)
+        mean += G2
         for i, sigma in enumerate(sigmas):
             result[i] += np.sum(np.any(dif>sigma*jumplimstat))
-    return result/num_source
+    print(mean / norm / num_source)
+    return result
+def debugger_monte_all(case=0, num_source=1, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
+            p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
+            alpha=PROTON_INJECTION_SPECTRUM, H=HALO_HEIGHT,finer_mean=1):
+    num_source = int(num_source)
+    Nd = int(Nd)
+    E = 1983*(1.58308693)**np.arange(9)[-5:]/1000
+    Edge = np.sqrt(E[1:]*E[:-1])
+    power = np.log(1e-1/1e-4) / np.log(1e2/1e-3)
+    jumplimstat = 1e-4 * (Edge/1e-3) ** power / 1.5
+    sigmas = np.linspace(0, 5, 100)
+    result = np.zeros_like(sigmas)
+    mean = np.zeros_like(E)
+    norm = np.zeros(5)
+    distancesq = np.linspace(0,2000**2,10000)
+    distances = np.sqrt(distancesq)
+    distancemid = (distances[1:] + distances[:-1]) /2
+    totalnumbsource = np.array([source_near_sun(d) for d in distances])
+    numbsource = np.diff(totalnumbsource)
+    # for j,d in enumerate(distancemid):
+    #     if case==0:
+    #         mean += debugger_point(d,finer_mean*Nd,D_0,delta,t_sed,p_break,t_life,p_max,p_min,t_break,alpha,H)[-5:]/finer_mean / 1500 * 1e5 * numbsource[j]
+    #     elif case==1:
+    #         mean += debugger_point_uncredit(d,finer_mean*Nd,D_0,delta,H,t_life)[-5:]/finer_mean / 1500 * 1e5 * numbsource[j]
+    #     else:
+    #         print('wrong case')
+    #         return 0
+    if case==0:
+        norm = np.load('mean_credit_searchrange.npy')
+    elif case==1:
+        norm = np.load('mean_uncredit_searchrange.npy')
+    else:
+        print('wrong case')
+        return 0
+    for i in range(num_source):
+        d2 = np.random.choice(distancemid,size=int(totalnumbsource[-1]*1e5),p=numbsource/np.sum(numbsource))
+        t = np.random.uniform(0,t_life,int(totalnumbsource[-1]*1e5))
+        print(d2,t)
+        rd2 = diffusion_length(E, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
+        rd3 = np.where(rd2>0, rd2, 1e-99)
+        ct2 = causal_length(E, t, p_break, t_life, p_max, p_min,t_break)
+        g2 = (np.pi*rd3)**(-3/2) * np.exp(-d2[:,np.newaxis]**2/rd3) *thetafunction_credit(E,t,D_0,delta,p_break,t_life,p_max,p_min,t_break,H)
+        g21 = np.where(d2[:,np.newaxis]<ct2, g2, 0)
+        G = np.where(rd2>0, g21, 0)
+        G2 = np.sum(G,axis=0)
+        ratio = G2/norm
+        dif = np.diff(ratio)
+        mean += G2
+        for i, sigma in enumerate(sigmas):
+            result[i] += np.sum(np.any(dif>sigma*jumplimstat))
+    print(mean / norm / num_source)
+    return result
 
+print(debugger_monte_all())
+# mean = np.zeros(5)
+# distancesq = np.linspace(0,2000**2,10000)
+# distances = np.sqrt(distancesq)
+# less = 0
+# for d in distances:
+#     more = source_near_sun(d) 
+#     sourcenumb = more - less
+#     less = source_near_sun(d)
+#     mean += debugger_point(d)[-5:] / 1500 * 1e5 * sourcenumb
+# print(mean)
+# np.save('mean_credit_searchrange',mean)
 # c30 = debugger_monte(30,0,20000)
 # c300 = debugger_monte(300,0,20000)
 # u30 = debugger_monte(30,1,20000)
 # u300 = debugger_monte(300,1,20000)
 # result = np.vstack((c30,c300,u30,u300))
 # np.save('Monte_combined',result)
-test = debugger_monte(30,1,10000,10000)
-test2 = debugger_monte(30,0,10000,10000)
-print(test)
-print(test2)
-print(test-test2)
+# numb_real = 10000
+# Nd = 1500
+# test1 = debugger_monte(30,1,numb_real,Nd,finer_mean=100)
+# test2 = debugger_monte(30,0,numb_real,Nd,finer_mean=100)
+# print(test1/numb_real)
+# print(test2/numb_real)
+# print(test1-test2)
 # c30 = np.load('Monte_30pc_credit.npy')
 # c300 = np.load('Monte_300pc_credit.npy')
 # u30 = np.load('Monte_30pc_uncredit.npy')
