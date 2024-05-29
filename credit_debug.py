@@ -183,12 +183,12 @@ def to_integrate(t_SNR,E, d, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM
 # for i in range(1000):
 #     for j in range(9):
 #         a[i,j] = np.array(quad(to_integrate,0,SOURCE_LIFETIME,args=(approx_DAMPE[j]/1000,4*i))[1])
-e = np.load('green_sum_integrated_error.npy')
-g = np.load('green_sum_integrated.npy')
-plt.plot(4*np.arange(1000),e/g)
-plt.yscale('log')
-plt.xscale('log')
-plt.savefig('green_sum_integrated_error')
+# e = np.load('green_sum_integrated_error.npy')
+# g = np.load('green_sum_integrated.npy')
+# plt.plot(4*np.arange(1000),e/g)
+# plt.yscale('log')
+# plt.xscale('log')
+# plt.savefig('green_sum_integrated_error')
 
 def debugger(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
@@ -250,10 +250,81 @@ def debugger_point(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SP
     fluxp = np.sum(G2,axis=0)
     return fluxp
 
+def debugger_point_uncredit(d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM,H=HALO_HEIGHT,t_life=SOURCE_LIFETIME):
+    Nd = int(Nd)
+    t = np.linspace(0,t_life,Nd)
+    approx_AMS = np.sqrt(1.16)*(1.10655)**((np.arange(721) - 5)/10)
+    approx_DAMPE = 1983*(1.58308693)**((np.arange(91) - 5)/10)
+    E = np.concatenate((approx_AMS, approx_DAMPE))/1000
+    ED = np.concatenate((E[5:722:10],E[726::10]))[-9:]
+    rd = 4 * D(ED[:,np.newaxis],D_0,delta) * t*YEAR_SECOND_CONVERSION / CM_PC_CONVERSION**2
+    cl = C*t*YEAR_SECOND_CONVERSION/CM_PC_CONVERSION
+    g1 = (np.pi*rd)**(-3/2) * np.exp(-d**2/rd) * thetafunction(ED[:,np.newaxis], t)
+    G = np.where(d<cl, g1, 0)
+    return np.sum(G,axis=1)
+
+    
 # test = np.zeros((1000,9))
 # for i in range(1000):
-#     test[i] = debugger_point(4*i+4)
-# np.save('greens_sum_point_boundedup',test)
+#     test[i] = debugger_point_uncredit(4*i)
+# np.save('greens_sum_point_uncredit',test)
+
+def debugger_monte(d=300, case=0, num_source=1, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
+            p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,
+            alpha=PROTON_INJECTION_SPECTRUM, H=HALO_HEIGHT):
+    num_source = int(num_source)
+    Nd = int(Nd)
+    E = 1983*(1.58308693)**np.arange(9)[-5:]/1000
+    Edge = np.sqrt(E[1:]*E[:-1])
+    power = np.log(1e-1/1e-4) / np.log(1e2/1e-3)
+    jumplimstat = 1e-4 * (Edge/1e-3) ** power / 1.5
+    sigmas = np.linspace(0, 5, 100)
+    result = np.zeros_like(sigmas)
+    if case==0:
+        norm = debugger_point(d,Nd,D_0,delta,t_sed,p_break,t_life,p_max,p_min,t_break,alpha,H)[-5:]
+    elif case==1:
+        norm = debugger_point_uncredit(d,Nd,D_0,delta,H,t_life)[-5:]
+    else:
+        return 'no case'
+    for i in range(num_source):
+        t = np.random.uniform(0,t_life,Nd)
+        rd2 = diffusion_length(E, t, D_0, delta, p_break, t_life, p_max, p_min,t_break)
+        rd3 = np.where(rd2>0, rd2, 1e-99)
+        ct2 = causal_length(E, t, p_break, t_life, p_max, p_min,t_break)
+        g2 = (np.pi*rd3)**(-3/2) * np.exp(-d**2/rd3) *thetafunction_credit(E,t,D_0,delta,p_break,t_life,p_max,p_min,t_break,H)
+        g21 = np.where(d<ct2, g2, 0)
+        G = np.where(rd2>0, g21, 0)
+        G2 = np.sum(G,axis=0)
+        ratio = G2/norm
+        dif = np.diff(ratio)
+        for i, sigma in enumerate(sigmas):
+            result[i] += np.sum(np.any(dif>sigma*jumplimstat))
+    return result/num_source
+
+# c30 = debugger_monte(30,0,20000)
+# c300 = debugger_monte(300,0,20000)
+# u30 = debugger_monte(30,1,20000)
+# u300 = debugger_monte(300,1,20000)
+# result = np.vstack((c30,c300,u30,u300))
+# np.save('Monte_combined',result)
+test = debugger_monte(30,1,10000,10000)
+test2 = debugger_monte(30,0,10000,10000)
+print(test)
+print(test2)
+print(test-test2)
+# c30 = np.load('Monte_30pc_credit.npy')
+# c300 = np.load('Monte_300pc_credit.npy')
+# u30 = np.load('Monte_30pc_uncredit.npy')
+# u300 = np.load('Monte_300pc_uncredit.npy')
+# print()
+# plt.plot(0.1+0.2*np.arange(26),c30,label='30pc credit')
+# plt.plot(0.1+0.2*np.arange(26),c300,label='300pc credit')
+# plt.plot(0.1+0.2*np.arange(26),u30,label='30pc no credit')
+# plt.plot(0.1+0.2*np.arange(26),u300,label='300pc no credit')
+# plt.legend()
+# plt.xlabel('sigmas')
+# plt.ylabel('probability of jumps')
+# plt.savefig('Monte_combined')
 
 def debugger2(num_source=1, d=300, Nd=1500, D_0=DIFFUSION_COEFFICIENT, delta=DIFFUSION_SPECTRUM, t_sed=SEDOV_TIME,
             p_break=10, t_life=SOURCE_LIFETIME, p_max=MAXIMUM_RIGIDITY, p_min=MINIMUM_RIGIDITY,t_break=SOURCE_LIFETIME-0.001,

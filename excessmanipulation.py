@@ -37,14 +37,15 @@ prob = np.loadtxt('H4000_R20_D0norm_sedovdouble')
 probmaxdist = np.loadtxt('maxdist')
 debugprob = np.load('numb_sources_300pc_10xtime_1e5realizationalt.npy')*10
 approx_DAMPE = 1.983*1.58308693**np.arange(9)
-greenssum1 = np.load('greens_sum_point_bounded.npy')/1500
+greenssum1 = np.load('greens_sum_point_bounded.npy')
+greenssumuc = np.load('greens_sum_point_uncredit.npy')
 greenssum3 = np.load('greens_sum_point_boundedup.npy')
 greenssum2 = np.load('/home/uq036563/excess/sumgreenspoint.npy')*(approx_DAMPE)**2.2
 greenssum = np.abs((greenssum1[1:]-greenssum3[:-1])/(greenssum1[1:]+greenssum3[:-1]))
 Antons = np.load('Anton_point_stat_10TV_100ykr_fiducial.npy')
 greensint = np.load('green_sum_integrated.npy')
 interror = np.load('green_sum_integrated_error.npy')
-greensdif = interror/greensint
+greensdif = np.abs((-greenssum1+greenssumuc)/(greenssum1+greenssumuc))
 #print(greensdif)
 #peaks, _ = find_peaks(life[1]/(N+10-np.arange(N)))
 # plt.plot(ages,one10kyr,label='1000pc/base')
@@ -66,7 +67,7 @@ ages = np.logspace(4.5,6.3,50)
 distances = np.linspace(100,10000,90)
 power = 3*maxage/100*(2000**2/2e4**2)
 plot = probmaxdist[:,:26]*100
-norm = colors.Normalize(np.min(debugprob),np.max(debugprob))
+norm = colors.Normalize(np.min(greenssumuc[:,-5:]),np.max(greenssumuc[:,-5:]))
 maxdists = np.array([100,200,300,400,500,600,1000,2000,4000])/1000
 binnumber = 9 * (np.arange(45) + 1)
 maxages = np.logspace(np.log10(1e5/4),np.log10(4*1e5),9)/1000
@@ -74,8 +75,8 @@ maxages = np.logspace(np.log10(1e5/4),np.log10(4*1e5),9)/1000
 #ax1.yaxis.set_major_locator(plt.MaxNLocator(16))
 #plt.pcolormesh(sigmas,np.arange(15)+1,debugprob[:,:26],norm=norm)
 #plt.pcolormesh(sigmas[:23],np.arange(15)+1,debugprob[0,:23]/debugprob[:,:23])
-norm1 = colors.LogNorm(1e-5,1e0)
-plt.pcolormesh(np.arange(9),4*np.arange(1000),greensdif,norm=norm1)
+norm1 = colors.LogNorm(np.min(greenssumuc[:100]),np.max(greenssumuc[:100]))
+plt.pcolormesh(np.arange(9),4*np.arange(1000)[:100],greenssumuc[:100],norm=norm1)
 #plt.vlines(2.13,maxdists[0],maxdists[-1],color='red',linewidth=0.5)
 #plt.imshow(sysall.T,interpolation='bilinear')
 #plt.plot(np.linspace(0,5,len(Antons)),Antons)
@@ -91,7 +92,7 @@ plt.colorbar(label='ratio of probabilities')
 #plt.clabel(cont,fontsize=5.5,colors='k',alpha=1)
 #plt.xlim(0,5)
 #plt.legend(['all','1-200GeV','200-1000GeV','1-3000TeV'])
-plt.savefig('greens_sum_point_int_error.png',dpi=150)
+plt.savefig('greens_sum_point_uncredit2.png',dpi=150)
 
 # plt.rc('font', size=22)
 # fig, axs = plt.subplots(1,3,sharey=True,figsize=(30,10))
